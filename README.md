@@ -1,5 +1,8 @@
 # Restaurant Website (Frontend)
 
+# PREVIEW
+https://wondrous-concha-0fe1ca.netlify.app/
+
 ## 📖 Overview
 The Restaurant Website is a frontend-based web project designed to present restaurant details in a clean and visually appealing manner.  
 This project focuses on layout design, visual consistency, and easy navigation for desktop users.
@@ -29,6 +32,5 @@ This project focuses on layout design, visual consistency, and easy navigation f
 
 ---
 
-# SCREENSHOTS
-  
+
 
