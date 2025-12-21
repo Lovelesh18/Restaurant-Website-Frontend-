@@ -1,0 +1,341 @@
+# Full updated Employee Management System with Admin and User support
+# Admin: Add, Update, Delete
+# User: Register, Login, View own records
+
+import tkinter as tk
+from tkinter import ttk, messagebox
+import sqlite3
+from openpyxl import Workbook
+import os
+
+# ========== Database Setup ========== 
+conn = sqlite3.connect("employees.db")
+cursor = conn.cursor()
+cursor.execute('''
+CREATE TABLE IF NOT EXISTS employees (
+    id INTEGER PRIMARY KEY,
+    username TEXT NOT NULL,
+    name TEXT NOT NULL,
+    department TEXT NOT NULL,
+    salary REAL NOT NULL,
+    gender TEXT NOT NULL,
+    mobile TEXT NOT NULL,
+    address TEXT NOT NULL
+)
+''')
+conn.commit()
+
+if not os.path.exists("users.txt"):
+    with open("users.txt", "w") as f:
+        pass
+
+# ========== Export to Excel ========== 
+def export_to_excel():
+    cursor.execute("SELECT * FROM employees")
+    data = cursor.fetchall()
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Employees"
+    headers = ["ID", "Username", "Name", "Department", "Salary", "Gender", "Mobile", "Address"]
+    ws.append(headers)
+    for row in data:
+        ws.append(row)
+    wb.save("employees.xlsx")
+
+# ========== Main App ========== 
+def main_app(user_type="admin", current_user=""):
+    root = tk.Tk()
+    root.title("Employee Management System")
+    root.geometry("950x600")
+
+    name_var = tk.StringVar()
+    dept_var = tk.StringVar()
+    salary_var = tk.StringVar()
+    gender_var = tk.StringVar()
+    mobile_var = tk.StringVar()
+    address_var = tk.StringVar()
+    username_display_var = tk.StringVar(value=current_user)
+
+    def fetch_employees():
+        tree.delete(*tree.get_children())
+        if user_type == "admin":
+            cursor.execute("SELECT * FROM employees")
+        else:
+            cursor.execute("SELECT * FROM employees WHERE username=?", (current_user,))
+        for row in cursor.fetchall():
+            tree.insert('', tk.END, values=row)
+
+    def clear_fields():
+        name_var.set("")
+        dept_var.set("")
+        salary_var.set("")
+        gender_var.set("")
+        mobile_var.set("")
+        address_var.set("")
+        if user_type == "admin":
+            username_display_var.set("")
+
+    def add_employee():
+        if user_type != "admin":
+            return
+        name = name_var.get().strip()
+        department = dept_var.get().strip()
+        salary_str = salary_var.get().strip()
+        gender = gender_var.get().strip()
+        mobile = mobile_var.get().strip()
+        address = address_var.get().strip()
+        username = username_display_var.get().strip()
+
+        if not all([name, department, salary_str, gender, mobile, address, username]):
+            messagebox.showwarning("Missing Info", "All fields are required.")
+            return
+
+        try:
+            salary = float(salary_str)
+            if salary < 0:
+                raise ValueError
+        except ValueError:
+            messagebox.showerror("Invalid Salary", "Salary must be a positive number.")
+            return
+
+        try:
+            cursor.execute('''
+                INSERT INTO employees (username, name, department, salary, gender, mobile, address)
+                VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                (username, name, department, salary, gender, mobile, address))
+            conn.commit()
+            fetch_employees()
+            export_to_excel()
+            clear_fields()
+            messagebox.showinfo("Success", "Employee added successfully.")
+        except Exception as e:
+            messagebox.showerror("Database Error", f"Failed to add employee: {e}")
+
+    def delete_employee():
+        if user_type != "admin":
+            return
+        selected = tree.focus()
+        if not selected:
+            messagebox.showwarning("Select Row", "Select an employee to delete.")
+            return
+        emp_id = tree.item(selected)["values"][0]
+        try:
+            cursor.execute("DELETE FROM employees WHERE id=?", (emp_id,))
+            conn.commit()
+            fetch_employees()
+            export_to_excel()
+            clear_fields()
+            messagebox.showinfo("Deleted", "Employee deleted.")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to delete: {e}")
+
+    def update_employee():
+        if user_type != "admin":
+            return
+        selected = tree.focus()
+        if not selected:
+            messagebox.showwarning("Select Row", "Select an employee to update.")
+            return
+        emp_id = tree.item(selected)["values"][0]
+        name = name_var.get().strip()
+        department = dept_var.get().strip()
+        salary_str = salary_var.get().strip()
+        gender = gender_var.get().strip()
+        mobile = mobile_var.get().strip()
+        address = address_var.get().strip()
+        username = username_display_var.get().strip()
+
+        if not all([name, department, salary_str, gender, mobile, address, username]):
+            messagebox.showwarning("Missing Info", "All fields are required.")
+            return
+
+        try:
+            salary = float(salary_str)
+            if salary < 0:
+                raise ValueError
+        except ValueError:
+            messagebox.showerror("Invalid Salary", "Salary must be a positive number.")
+            return
+
+        try:
+            cursor.execute('''
+                UPDATE employees SET username=?, name=?, department=?, salary=?, gender=?, mobile=?, address=?
+                WHERE id=?
+            ''', (username, name, department, salary, gender, mobile, address, emp_id))
+            conn.commit()
+            fetch_employees()
+            export_to_excel()
+            clear_fields()
+            messagebox.showinfo("Success", "Employee details updated.")
+        except Exception as e:
+            messagebox.showerror("Database Error", f"Failed to update employee: {e}")
+
+    def on_tree_select(event):
+        selected = tree.focus()
+        if selected:
+            vals = tree.item(selected, "values")
+            username_display_var.set(vals[1])
+            name_var.set(vals[2])
+            dept_var.set(vals[3])
+            salary_var.set(vals[4])
+            gender_var.set(vals[5])
+            mobile_var.set(vals[6])
+            address_var.set(vals[7])
+
+    def search_employee():
+        keyword = search_var.get()
+        tree.delete(*tree.get_children())
+        if user_type == "admin":
+            cursor.execute("SELECT * FROM employees WHERE name LIKE ?", (f"%{keyword}%",))
+        else:
+            cursor.execute("SELECT * FROM employees WHERE name LIKE ? AND username=?", (f"%{keyword}%", current_user))
+        for row in cursor.fetchall():
+            tree.insert('', tk.END, values=row)
+
+    state_type = "normal" if user_type == "admin" else "readonly"
+    username_entry_state = "normal" if user_type == "admin" else "readonly"
+
+    form_frame = tk.LabelFrame(root, text="Employee Details", padx=10, pady=10)
+    form_frame.pack(fill="x", padx=20, pady=10)
+
+    tk.Label(form_frame, text="Name").grid(row=0, column=0, padx=10, pady=5, sticky="w")
+    tk.Entry(form_frame, textvariable=name_var, width=30, state=state_type).grid(row=0, column=1)
+
+    tk.Label(form_frame, text="Department").grid(row=0, column=2, padx=10, pady=5, sticky="w")
+    tk.Entry(form_frame, textvariable=dept_var, width=30, state=state_type).grid(row=0, column=3)
+
+    tk.Label(form_frame, text="Salary").grid(row=1, column=0, padx=10, pady=5, sticky="w")
+    tk.Entry(form_frame, textvariable=salary_var, width=30, state=state_type).grid(row=1, column=1)
+
+    tk.Label(form_frame, text="Gender").grid(row=1, column=2, padx=10, pady=5, sticky="w")
+    ttk.Combobox(form_frame, textvariable=gender_var, values=["Male", "Female", "Other"], state="readonly" if user_type == "admin" else "disabled", width=28).grid(row=1, column=3)
+
+    tk.Label(form_frame, text="Mobile").grid(row=2, column=0, padx=10, pady=5, sticky="w")
+    tk.Entry(form_frame, textvariable=mobile_var, width=30, state=state_type).grid(row=2, column=1)
+
+    tk.Label(form_frame, text="Address").grid(row=2, column=2, padx=10, pady=5, sticky="w")
+    tk.Entry(form_frame, textvariable=address_var, width=30, state=state_type).grid(row=2, column=3)
+
+    tk.Label(form_frame, text="Username").grid(row=3, column=0, padx=10, pady=5, sticky="w")
+    tk.Entry(form_frame, textvariable=username_display_var, width=30, state=username_entry_state).grid(row=3, column=1)
+
+    btn_frame = tk.Frame(root)
+    btn_frame.pack(pady=10)
+    if user_type == "admin":
+        tk.Button(btn_frame, text="Add", width=12, command=add_employee).grid(row=0, column=0, padx=10)
+        tk.Button(btn_frame, text="Delete", width=12, command=delete_employee).grid(row=0, column=1, padx=10)
+        tk.Button(btn_frame, text="Update", width=12, command=update_employee).grid(row=0, column=2, padx=10)
+    tk.Button(btn_frame, text="Clear", width=12, command=clear_fields).grid(row=0, column=3, padx=10)
+
+    search_frame = tk.Frame(root)
+    search_frame.pack(pady=5)
+    search_var = tk.StringVar()
+    tk.Label(search_frame, text="Search Name:").pack(side=tk.LEFT, padx=5)
+    tk.Entry(search_frame, textvariable=search_var).pack(side=tk.LEFT, padx=5)
+    tk.Button(search_frame, text="Search", command=search_employee).pack(side=tk.LEFT, padx=5)
+    tk.Button(search_frame, text="Show All", command=fetch_employees).pack(side=tk.LEFT, padx=5)
+
+    tree = ttk.Treeview(root, columns=("ID", "Username", "Name", "Department", "Salary", "Gender", "Mobile", "Address"), show="headings")
+    for col in tree["columns"]:
+        tree.heading(col, text=col)
+        tree.column(col, anchor="center", width=100)
+    tree.pack(fill="both", expand=True, padx=20, pady=10)
+    tree.bind("<<TreeviewSelect>>", on_tree_select)
+
+    fetch_employees()
+    root.mainloop()
+
+# ========== Login Window ========== 
+login_window = tk.Tk()
+login_window.title("Employee Management System")
+window_width, window_height = 500, 350
+screen_width = login_window.winfo_screenwidth()
+screen_height = login_window.winfo_screenheight()
+x = (screen_width - window_width) // 2
+y = (screen_height - window_height) // 2
+login_window.geometry(f"{window_width}x{window_height}+{x}+{y}")
+login_window.configure(bg="#f0f4f7")
+
+username_var = tk.StringVar()
+password_var = tk.StringVar()
+show_pw_var = tk.BooleanVar()
+
+frame = tk.Frame(login_window, padx=30, pady=30, bg="white", bd=2, relief="groove")
+frame.pack(expand=True, padx=30, pady=30)
+
+header = tk.Label(frame, text="Employee Management System", font=("Segoe UI", 16, "bold"), bg="white", fg="#2c3e50")
+header.grid(row=0, column=0, columnspan=2, pady=15)
+
+label_user = tk.Label(frame, text="Username:", font=("Segoe UI", 11), bg="white")
+label_user.grid(row=1, column=0, sticky="e", pady=5, padx=5)
+entry_user = tk.Entry(frame, textvariable=username_var, width=30, font=("Segoe UI", 10))
+entry_user.grid(row=1, column=1, pady=5)
+
+label_pw = tk.Label(frame, text="Password:", font=("Segoe UI", 11), bg="white")
+label_pw.grid(row=2, column=0, sticky="e", pady=5, padx=5)
+pw_entry = tk.Entry(frame, textvariable=password_var, show="*", width=30, font=("Segoe UI", 10))
+pw_entry.grid(row=2, column=1, pady=5)
+
+show_checkbox = tk.Checkbutton(frame, text="Show Password", variable=show_pw_var, command=lambda: pw_entry.config(show="" if show_pw_var.get() else "*"), bg="white", font=("Segoe UI", 9))
+show_checkbox.grid(row=3, column=1, sticky="w", pady=5)
+
+# Login Logic
+def admin_login():
+    user = username_var.get().strip()
+    pw = password_var.get().strip()
+    if user == "Rana ji" and pw == "rana123":
+        login_window.destroy()
+        main_app("admin", "")
+    else:
+        messagebox.showerror("Login Failed", "Invalid Admin credentials.")
+
+def user_login():
+    user = username_var.get().strip()
+    pw = password_var.get().strip()
+    if not user or not pw:
+        messagebox.showwarning("Input Error", "Both Username and Password are required.")
+        return
+    with open("users.txt", "r") as f:
+        for line in f:
+            if ',' in line:
+                u, p = line.strip().split(",", 1)
+                if u == user and p == pw:
+                    login_window.destroy()
+                    main_app("user", user)
+                    return
+    messagebox.showerror("Login Failed", "Invalid username or password.")
+
+def register_user():
+    user = username_var.get().strip()
+    pw = password_var.get().strip()
+    if not user or not pw:
+        messagebox.showwarning("Input Error", "Both Username and Password are required.")
+        return
+    with open("users.txt", "r") as f:
+        for line in f:
+            if ',' in line:
+                existing_user, _ = line.strip().split(",", 1)
+                if existing_user == user:
+                    messagebox.showerror("Registration Error", "Username already exists.")
+                    return
+    with open("users.txt", "a") as f:
+        f.write(f"{user},{pw}\n")
+    messagebox.showinfo("Registration Successful", "User registered successfully. Now login to view employee details.")
+
+# Buttons
+btn_frame = tk.Frame(frame, bg="white")
+btn_frame.grid(row=4, column=0, columnspan=2, pady=15)
+
+btn_admin = tk.Button(btn_frame, text="Admin Portal", width=18, font=("Segoe UI", 10), bg="#34495e", fg="white", command=admin_login)
+btn_admin.grid(row=0, column=0, padx=5, pady=5)
+
+btn_user = tk.Button(btn_frame, text="User Login", width=18, font=("Segoe UI", 10), bg="#2980b9", fg="white", command=user_login)
+btn_user.grid(row=0, column=1, padx=5, pady=5)
+
+btn_register = tk.Button(btn_frame, text="User Register", width=18, font=("Segoe UI", 10), bg="#27ae60", fg="white", command=register_user)
+btn_register.grid(row=1, column=0, padx=5, pady=5)
+
+btn_exit = tk.Button(btn_frame, text="Exit", width=18, font=("Segoe UI", 10), bg="#c0392b", fg="white", command=login_window.destroy)
+btn_exit.grid(row=1, column=1, padx=5, pady=5)
+
+login_window.mainloop()
