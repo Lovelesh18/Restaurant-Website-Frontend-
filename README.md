@@ -1,2 +1,34 @@
-# Restaurant-Website-Frontend-
-Designed a desktop-based restaurant website using HTML and CSS with a focus on clean UI and structured layout.
+# Restaurant Website (Frontend)
+
+## 📖 Overview
+The Restaurant Website is a frontend-based web project designed to present restaurant details in a clean and visually appealing manner.  
+This project focuses on layout design, visual consistency, and easy navigation for desktop users.
+
+---
+
+## 🛠️ Features
+- Home section with restaurant introduction
+- Menu section displaying food items
+- Gallery section for images
+- Contact section with basic details
+- Clean and structured desktop layout
+
+---
+
+## 💻 Technologies Used
+- HTML
+- CSS
+
+---
+
+## 🎯 Project Focus
+- Frontend design fundamentals
+- Desktop-based layout
+- UI structure and visual presentation
+- Static website development
+
+---
+
+# SCREENSHOTS
+  
+
